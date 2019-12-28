@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redis
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: redis
+  name: redis-cli-hs
+  labels:
+    app: redis
+spec:
+  ports:
+    - port: 6379
+      name: hs-port
+  selector:
+    app: redis
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-single-svc
+  namespace: redis
+spec:
+  ports:
+    - port: 6379
+      name: client
+      nodePort: 31687
+  selector:
+    app: redis-single # 筛选pod label 不是 stateful set label
+  type: NodePort
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-single
+  namespace: redis
+  labels:
+    app: redis-ss-single
+spec:
+  selector:
+    matchLabels:
+      app: redis-single
+  serviceName: redis-cli-hs
+  template:
+    metadata:
+      namespace: redis
+      name: redis-single
+      labels:
+        app: redis-single
+    spec:
+      containers:
+        - name: redis-single
+          image: redis
+          ports:
+            - containerPort: 3306
+#          执行不了，没有权限
+#          readinessProbe:
+#            initialDelaySeconds: 5
+#            timeoutSeconds: 50
+#            periodSeconds: 3
+#            exec:
+#              command:
+#                - sh
+#                - -c
+#                - "/probe.sh"
+#          livenessProbe:
+#            initialDelaySeconds: 5
+#            timeoutSeconds: 50
+#            periodSeconds: 2
+#            exec:
+#              command:
+#                - sh
+#                - -c
+#                - "/probe.sh"
+          volumeMounts:
+            - mountPath: /data
+              name: redis-single-data
+      volumes:
+        - name: redis-single-data
+          persistentVolumeClaim:
+            claimName: redis-single-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-single-pvc
+  namespace: redis
+spec:
+  storageClassName: redis-sc
+  accessModes: ["ReadWriteOnce"]
+  volumeName: redis-pv
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: redis-sc
+  namespace: redis
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+spec:
+  storageClassName: redis-sc
+  capacity:
+    storage: 10Gi
+  accessModes: ["ReadWriteOnce"]
+  local:
+    path: /home/pdf/data/redis
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: nosql
+              operator: In
+              values:
+                - redis

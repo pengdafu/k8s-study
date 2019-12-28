@@ -1,0 +1,186 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zookeeper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zk-hs # zookeeper  headless service
+  labels:
+    app: zk
+  namespace: zookeeper
+spec:
+  ports:
+    - name: server
+      port: 2888
+    - name: leader-election
+      port: 3888
+  clusterIP: None
+  selector:
+    app: zk
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zk-cs # zookeeper client service
+  labels:
+    app: zk
+  namespace: zookeeper
+spec:
+  ports:
+    - name: client
+      port: 2181
+  selector:
+    app: zk
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: zk-pdb
+  namespace: zookeeper
+spec:
+  selector:
+    matchLabels:
+      app: zk
+  maxUnavailable: 2
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zk
+  namespace: zookeeper
+  labels:
+    app: zk
+spec:
+  selector:
+    matchLabels:
+      app: zk
+  serviceName: zk-hs
+  replicas: 3
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel # stateful set 启动关系，默认是 Ordering 即按顺序启动， Parallel 表示并行启动
+  template:
+    metadata:
+      labels:
+        app: zk
+      namespace: zookeeper
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                      - zk
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: kubernetes-zookeeper
+          imagePullPolicy: Always
+          image: "k8s.gcr.io/kubernetes-zookeeper:1.0-3.4.10"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+          ports:
+            - name: client
+              containerPort: 2181
+            - name: server
+              containerPort: 2888
+            - name: leader-election
+              containerPort: 3888
+          command:
+            - sh
+            - -c
+            - "start-zookeeper \
+                        --servers=3 \
+                        --data_dir=/var/lib/zookeeper/data \
+                        --data_log_dir=/var/lib/zookeeper/data/log \
+                        --conf_dir=/opt/zookeeper/conf \
+                        --client_port=2181 \
+                        --election_port=3888 \
+                        --server_port=2888 \
+                        --tick_time=2000 \
+                        --init_limit=10 \
+                        --sync_limit=5 \
+                        --heap=512M \
+                        --max_client_cnxns=60 \
+                        --snap_retain_count=3 \
+                        --purge_interval=12 \
+                        --max_session_timeout=40000 \
+                        --min_session_timeout=4000 \
+                        --log_level=INFO"
+          # zk 启动很慢 也不知道是不是core dns的问题，如果探针设置时间过短，
+          # 会导致无法解析dns: zk-*.zk-hs.zookeeper.svc.cluster.local无法 解析
+          # 从而探活失败，一直重启
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - c
+                - "zookeeper-ready 2181"
+            initialDelaySeconds: 40
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - c
+                - "zookeeper-ready 2181"
+            initialDelaySeconds: 40
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: zk-data
+              mountPath: /var/lib/zookeeper
+      volumes:
+        - name: zk-data
+          persistentVolumeClaim:
+            claimName: zk-pvc
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zk-pvc
+  namespace: zookeeper
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: zk-sc
+  volumeName: zk-pv
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: zk-sc
+  namespace: zookeeper
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  namespace: zookeeper
+  name: zk-pv
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: zk-sc
+  capacity:
+    storage: 20Gi
+  local:
+    path: /home/pdf/zk-data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: zk
+              operator: In
+              values:
+                - "true"

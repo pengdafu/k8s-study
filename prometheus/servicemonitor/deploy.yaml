@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-test
+spec:
+  selector:
+    matchLabels:
+      app: metrics-test
+  replicas: 1
+  template:
+    metadata:
+      name: metrics-test
+      labels:
+        app: metrics-test
+    spec:
+      containers:
+        - name: metrics
+          image: registry.cn-shenzhen.aliyuncs.com/pdf/metrics:v1
+          ports:
+            - containerPort: 8080

@@ -17,7 +17,7 @@ kubectl apply -f ingress-nginx.yaml
 运行 `ingress` :
 
 ```shell script
-kubectl apply -f ingress.yaml
+kubectl apply -f monitoring-ingress.yaml
 ```
 
 访问 `local.prometheus.io` 即可访问 普罗米修斯 的首页。 grafana 同理。

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hpa-demo-svc
+spec:
+  ports:
+    - port: 8080
+  selector:
+    app: hpa-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: hpa-demo
+  labels:
+    app: hpa-demo
+spec:
+  selector:
+    matchLabels:
+      app: hpa-demo
+  template:
+    metadata:
+      name: hpa-demo
+      labels:
+        app: hpa-demo
+    spec:
+      containers:
+        - name: myapp
+          image: reg.pdf.cn/library/myapp:v1
+          resources:
+            requests:
+              cpu: 200m
+          ports:
+            - containerPort: 8080
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-demo
+spec:
+  maxReplicas: 10
+  scaleTargetRef:
+    kind: Deployment
+    apiVersion: apps/v1
+    name: hpa-demo
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 50

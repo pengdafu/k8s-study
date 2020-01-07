@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-exportor
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: mysql-exporter
+  replicas: 1
+  template:
+    metadata:
+      namespace: monitoring
+      name: mysql-exporter
+      labels:
+        app: mysql-exporter
+    spec:
+      containers:
+        - name: mysql-exporter
+          image: prom/mysqld-exporter
+          ports:
+            - containerPort: 9104
+              name: mysql-exporter
+          env:
+            - name: DATA_SOURCE_NAME
+              value: root:password@(mysql-0.mysql-hs.default.svc.cluster.local:3306)/metrics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-exporter-svc
+  namespace: monitoring
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9104"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 9104
+      name: mysql-exporter
+  selector:
+    app: mysql-exporter

@@ -58,25 +58,22 @@ spec:
           image: redis
           ports:
             - containerPort: 3306
-#          执行不了，没有权限
-#          readinessProbe:
-#            initialDelaySeconds: 5
-#            timeoutSeconds: 50
-#            periodSeconds: 3
-#            exec:
-#              command:
-#                - sh
-#                - -c
-#                - "/probe.sh"
-#          livenessProbe:
-#            initialDelaySeconds: 5
-#            timeoutSeconds: 50
-#            periodSeconds: 2
-#            exec:
-#              command:
-#                - sh
-#                - -c
-#                - "/probe.sh"
+          readinessProbe:
+            initialDelaySeconds: 5
+            timeoutSeconds: 50
+            periodSeconds: 3
+            exec:
+              command:
+                - redis-cli
+                - ping
+          livenessProbe:
+            initialDelaySeconds: 5
+            timeoutSeconds: 50
+            periodSeconds: 2
+            exec:
+              command:
+                - redis-cli
+                - ping
           volumeMounts:
             - mountPath: /data
               name: redis-single-data

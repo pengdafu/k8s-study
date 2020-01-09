@@ -1,0 +1,1 @@
+[redis](../stateful-set/redis-single.yaml) 已经部署

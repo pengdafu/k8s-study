@@ -1,0 +1,173 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab
+  namespace: devops
+spec:
+  selector:
+    matchLabels:
+      app: gitlab
+  template:
+    metadata:
+      namespace: devops
+      name: gitlab
+      labels:
+        app: gitlab
+    spec:
+      initContainers:
+        - name: fix-permissions
+          imagePullPolicy: IfNotPresent
+          image: busybox
+          volumeMounts:
+            - mountPath: /home/git/data
+              name: data
+          command:
+            - sh
+            - -c
+            - chown -R 1000:1000 /home/git/data
+          securityContext:
+            privileged: true
+      containers:
+        - name: gitlab
+          image: sameersbn/gitlab:12.5.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TZ
+              value: Asia/Shanghai
+            - name: GITLAB_TIMEZONE
+              value: Beijing
+            - name: GITLAB_SECRETS_DB_KEY_BASE
+              value: long-and-random-alpha-numeric-string
+            - name: GITLAB_SECRETS_SECRET_KEY_BASE
+              value: long-and-random-alpha-numeric-string
+            - name: GITLAB_SECRETS_OTP_KEY_BASE
+              value: long-and-random-alpha-numeric-string
+            - name: GITLAB_ROOT_PASSWORD
+              value: pdf0824gitlab
+            - name: GITLAB_ROOT_EMAIL
+              value: 15114876417@163.com
+            - name: GITLAB_HOST
+              value: git.k8s.local
+            - name: GITLAB_PORT
+              value: "80"
+            - name: GITLAB_SSH_PORT
+              value: "22"
+            - name: GITLAB_NOTIFY_ON_BROKEN_BUILDS
+              value: "true"
+            - name: GITLAB_NOTIFY_PUSHER
+              value: "false"
+            - name: GITLAB_BACKUP_SCHEDULE
+              value: daily
+            - name: GITLAB_BACKUP_TIME
+              value: 01:00
+            - name: DB_TYPE
+              value: postgres
+            - name: DB_HOST
+              value: postgresql-svc
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: gitlab
+            - name: DB_PASS
+              value: pdf0824gitlab
+            - name: DB_NAME
+              value: gitlab_producation
+            - name: REDIS_HOST
+              value: 192.168.131.128
+            - name: REDIS_PORT
+              value: "31687"
+          ports:
+            - containerPort: 80
+              name: http
+            - containerPort: 22
+              name: ssh
+          volumeMounts:
+            - mountPath: /home/git/data
+              name: data
+#          readinessProbe:
+#            httpGet:
+#              port: 80
+#              path: /
+#            initialDelaySeconds: 60
+#            timeoutSeconds: 1
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: gitlab-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-svc
+  namespace: devops
+  labels:
+    app: gitlab-svc
+spec:
+  ports:
+    - port: 80
+      name: http
+    - port: 22
+      name: ssh
+  selector:
+    app: gitlab
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: gitlab-ins
+  namespace: devops
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+    - http:
+        paths:
+          - backend:
+              serviceName: gitlab-svc
+              servicePort: http
+          - backend:
+              serviceName: gitlab-svc
+              servicePort: ssh
+      host: git.k8s.local
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: gitlab-sc
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: gitlab-pv
+spec:
+  capacity:
+    storage: 10Gi
+  local:
+    path: /home/pdf/data/gitlab
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - pg
+  storageClassName: gitlab-sc
+  accessModes:
+    - ReadWriteOnce
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-pvc
+  namespace: devops
+spec:
+  storageClassName: gitlab-sc
+  resources:
+    requests:
+      storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  volumeName: gitlab-pv

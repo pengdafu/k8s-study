@@ -1,0 +1,135 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  labels:
+    app: postgresql
+  namespace: devops
+spec:
+  selector:
+    matchLabels:
+      app: postgresql
+  replicas: 1
+  template:
+    metadata:
+      name: postgresql
+      labels:
+        app: postgresql
+    spec:
+      initContainers:
+        - name: fix-permissions
+          imagePullPolicy: IfNotPresent
+          image: busybox
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/lib/postgresql
+              name: data
+          command:
+            - sh
+            - -c
+            - chown -R 999:999 /var/lib/postgresql
+      containers:
+        - name: postgresql
+          image: sameersbn/postgresql:10-2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_USER
+              value: gitlab
+            - name: DB_PASS
+              value: pdf0824gitlab
+            - name: DB_NAME
+              value: gitlab_producation
+            - name: DB_EXTENSION
+              value: pg_trgm
+            - name: USERMAP_UID
+              value: "999"
+            - name: USERRAM_PID
+              value: "999"
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - mountPath: /var/lib/postgresql
+              name: data
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -h
+                - localhost
+                - -U
+                - postgres
+            initialDelaySeconds: 40
+            timeoutSeconds: 1
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgresql-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-svc
+  namespace: devops
+  labels:
+    app: postgresql-svc
+spec:
+  ports:
+    - port: 5432
+      name: postgres
+      targetPort: postgres
+  selector:
+    app: postgresql
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-pvc
+  namespace: devops
+spec:
+  storageClassName: postgresql-sc
+  accessModes:
+    - ReadWriteOnce
+  volumeName: postgresql-pv
+  resources:
+    requests:
+      cpu: 200m
+      storage: 10Gi
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+provisioner: kubernets.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+metadata:
+  name: postgresql-sc
+  namespace: devops
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgresql-pv
+spec:
+  local:
+    path: /home/pdf/data/postgresql
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - pg
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: postgresql-sc
+

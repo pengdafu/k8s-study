@@ -47,7 +47,7 @@ spec:
             - name: GITLAB_ROOT_EMAIL
               value: 15114876417@163.com
             - name: GITLAB_HOST
-              value: git.k8s.local
+              value: git.ngrok.pengdafu.ren
             - name: GITLAB_PORT
               value: "80"
             - name: GITLAB_SSH_PORT
@@ -71,7 +71,7 @@ spec:
             - name: DB_PASS
               value: pdf0824gitlab
             - name: DB_NAME
-              value: gitlab_producation
+              value: gitlab
             - name: REDIS_HOST
               value: 192.168.131.128
             - name: REDIS_PORT
@@ -129,6 +129,12 @@ spec:
               serviceName: gitlab-svc
               servicePort: ssh
       host: git.k8s.local
+    - http:
+        paths:
+          - backend:
+              serviceName: gitlab-svc
+              servicePort: http
+      host: git.ngrok.pengdafu.ren
 ---
 kind: StorageClass
 apiVersion: storage.k8s.io/v1

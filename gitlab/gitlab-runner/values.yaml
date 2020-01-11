@@ -22,7 +22,7 @@ gitlabUrl: http://git.k8s.local/
 ## be retrieved from your GitLab Instance.
 ## ref: https://docs.gitlab.com/ce/ci/runners/README.html
 ##
-runnerRegistrationToken: "y_gy4472hvzs1fqNwUij"
+runnerRegistrationToken: "guUCUYsXpfqHC_vBLske"
 
 ## The Runner Token for adding new Runners to the GitLab Server. This must
 ## be retrieved from your GitLab Instance. It is token of already registered runner.
@@ -248,7 +248,7 @@ runners:
 
   ## If Gitlab is not reachable through $CI_SERVER_URL
   ##
-  # cloneUrl:
+  cloneUrl: http://git.ngrok.pengdafu.ren/
 
   ## Specify node labels for CI job pods assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/

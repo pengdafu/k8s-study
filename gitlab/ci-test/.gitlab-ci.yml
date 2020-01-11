@@ -1,0 +1,34 @@
+image: reg.pdf.cn/library/docker:stable
+
+stages:
+  - build
+  - test
+#before_script:
+#  - echo before start
+#  - docker login -u admin -p pdf0824 reg.pdf.cn
+#  - echo login success
+
+build_job:
+  stage: build
+  services:
+    - reg.pdf.cn/library/docker:dind
+  variables:
+    DOCKER_HOST: tcp://localhost:2375
+    DOCKER_TLS_CERTDIR: ""
+  tags:
+    - k8s-runner
+  only:
+    - master
+  script:
+    - docker login -u admin -p pdf0824 reg.pdf.cn
+    - docker build -t reg.pdf.cn/ci/myapp:v2 .
+    - docker push reg.pdf.cn/ci/myapp:v2
+    - docker rmi reg.pdf.cn/ci/myapp:v2
+test_job:
+  stage: test
+  tags:
+    - k8s-runner
+  script:
+    - echo test
+    - echo lucky
+  when: on_success

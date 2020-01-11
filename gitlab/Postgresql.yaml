@@ -45,7 +45,7 @@ spec:
             - name: DB_PASS
               value: pdf0824gitlab
             - name: DB_NAME
-              value: gitlab_producation
+              value: gitlab
             - name: DB_EXTENSION
               value: pg_trgm
             - name: USERMAP_UID
@@ -66,7 +66,7 @@ spec:
                 - localhost
                 - -U
                 - postgres
-            initialDelaySeconds: 40
+            initialDelaySeconds: 20
             timeoutSeconds: 1
       volumes:
         - name: data

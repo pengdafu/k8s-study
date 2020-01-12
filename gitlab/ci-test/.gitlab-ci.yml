@@ -2,7 +2,7 @@ image: reg.pdf.cn/library/docker:stable
 
 stages:
   - build
-  - test
+  - deploy
 #before_script:
 #  - echo before start
 #  - docker login -u admin -p pdf0824 reg.pdf.cn
@@ -24,11 +24,14 @@ build_job:
     - docker build -t reg.pdf.cn/ci/myapp:v2 .
     - docker push reg.pdf.cn/ci/myapp:v2
     - docker rmi reg.pdf.cn/ci/myapp:v2
-test_job:
-  stage: test
+
+deploy_job:
+  stage: deploy
+  image: reg.pdf.cn/library/kubectl:latest
   tags:
     - k8s-runner
   script:
-    - echo test
-    - echo lucky
-  when: on_success
+    - kubectl version
+    - kubectl cluster-info
+    - kubectl apply -f deploy.yaml
+    - echo success
